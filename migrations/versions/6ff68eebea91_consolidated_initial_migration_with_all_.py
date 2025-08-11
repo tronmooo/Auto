@@ -1,16 +1,17 @@
-"""Initial migration with user subscriptions
+"""Consolidated initial migration with all features
 
-Revision ID: d0ed6453be9a
+Revision ID: 6ff68eebea91
 Revises:
-Create Date: 2025-08-11 01:48:54.209368
+Create Date: 2025-08-11 02:00:23.337162
 
 """
 from alembic import op
 import sqlalchemy as sa
+import sqlalchemy_utils
 
 
 # revision identifiers, used by Alembic.
-revision = 'd0ed6453be9a'
+revision = '6ff68eebea91'
 down_revision = None
 branch_labels = None
 depends_on = None
@@ -34,8 +35,10 @@ def upgrade():
     sa.Column('business_name', sa.String(length=120), nullable=False),
     sa.Column('service_area', sa.String(length=200), nullable=False),
     sa.Column('specialties', sa.Text(), nullable=True),
-    sa.Column('google_api_key', sa.String(length=256), nullable=True),
-    sa.Column('gemini_api_key', sa.String(length=256), nullable=True),
+    sa.Column('google_api_key', sqlalchemy_utils.types.encrypted.encrypted_type.EncryptedType(), nullable=True),
+    sa.Column('gemini_api_key', sqlalchemy_utils.types.encrypted.encrypted_type.EncryptedType(), nullable=True),
+    sa.Column('google_account_id', sa.String(length=128), nullable=True),
+    sa.Column('google_location_id', sa.String(length=128), nullable=True),
     sa.ForeignKeyConstraint(['user_id'], ['user.id'], ),
     sa.PrimaryKeyConstraint('id')
     )

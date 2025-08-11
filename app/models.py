@@ -1,6 +1,18 @@
+import os
+from dotenv import load_dotenv
+from sqlalchemy_utils import EncryptedType
 from werkzeug.security import generate_password_hash, check_password_hash
 from flask_login import UserMixin
 from .extensions import db
+
+load_dotenv()
+
+# The secret key for encryption should be loaded from environment variables
+# and should be a 32-byte URL-safe base64-encoded key.
+# For demonstration, we're using a key from the environment.
+# In a real production app, this key management would be more robust.
+secret_key = os.environ.get('SECRET_ENCRYPTION_KEY', 'default-key-is-not-secure-at-all')
+
 
 class User(UserMixin, db.Model):
     id = db.Column(db.Integer, primary_key=True)
@@ -27,10 +39,13 @@ class BusinessProfile(db.Model):
     service_area = db.Column(db.String(200), nullable=False)
     specialties = db.Column(db.Text) # e.g., "kitchen remodel, bathroom remodel"
 
-    # Placeholder for encrypted API keys
-    # In a real app, use something like sqlalchemy-utils' EncryptedType
-    google_api_key = db.Column(db.String(256))
-    gemini_api_key = db.Column(db.String(256))
+    # Encrypted API keys
+    google_api_key = db.Column(EncryptedType(db.String(512), secret_key))
+    gemini_api_key = db.Column(EncryptedType(db.String(512), secret_key))
+
+    # Google Business Profile specific IDs
+    google_account_id = db.Column(db.String(128))
+    google_location_id = db.Column(db.String(128))
 
     def __repr__(self):
         return f'<BusinessProfile {self.business_name}>'

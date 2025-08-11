@@ -41,6 +41,9 @@ def create_app(config_class=Config):
     from .payments_bp import bp as payments_bp
     app.register_blueprint(payments_bp)
 
+    from .profile_bp import bp as profile_bp
+    app.register_blueprint(profile_bp)
+
     # Import models here to ensure they are registered with SQLAlchemy
     from . import models
 

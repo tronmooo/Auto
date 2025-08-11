@@ -1,129 +1,151 @@
 import os
-import random
+import google.generativeai as genai
+from googleapiclient.discovery import build
+from google.oauth2 import service_account
+from flask import current_app
 
-# Placeholder for Google API client
-# from googleapiclient.discovery import build
+# It's assumed that the user will provide a service account JSON file
+# for authentication with Google APIs. The path to this file would be
+# stored in the environment. For now, this is a placeholder.
+# In a real app, you would load this from a secure location.
+SERVICE_ACCOUNT_FILE = os.environ.get('GOOGLE_APPLICATION_CREDENTIALS')
 
-# Placeholder for Gemini API client
-# import google.generativeai as genai
+def get_google_api_service(service_name, version):
+    """Builds and returns a Google API service object."""
+    if not SERVICE_ACCOUNT_FILE:
+        raise Exception("GOOGLE_APPLICATION_CREDENTIALS environment variable not set.")
 
-def get_google_reviews(api_key, account_id, location_id):
+    # Define the scopes needed for the Business Profile API
+    scopes = ['https://www.googleapis.com/auth/business.manage']
+
+    creds = service_account.Credentials.from_service_account_file(
+        SERVICE_ACCOUNT_FILE, scopes=scopes)
+
+    service = build(service_name, version, credentials=creds)
+    return service
+
+def get_google_reviews(business):
     """
-    Placeholder function to fetch new reviews from the Google Business Profile API.
-    In a real implementation, this would use the Google API client.
-    For now, it returns mock data.
+    Fetches new reviews from the Google Business Profile API.
+    This is a simplified example. A real implementation would need to handle
+    pagination and robust error checking.
     """
-    print(f"Fetching reviews for account {account_id}, location {location_id}...")
+    print(f"Fetching Google reviews for {business.business_name}...")
+    try:
+        # These IDs would be stored as part of the business profile
+        account_id = business.google_account_id
+        location_id = business.google_location_id
 
-    # Mock reviews
-    mock_reviews = [
-        {
-            "reviewId": "12345",
-            "reviewer": {"displayName": "John Doe"},
-            "starRating": "FIVE",
-            "comment": "Absolutely fantastic service! The team was professional, efficient, and the results exceeded my expectations. Highly recommend the custom kitchen remodel.",
-            "createTime": "2024-07-20T10:00:00Z",
-            "updateTime": "2024-07-20T10:00:00Z",
-        },
-        {
-            "reviewId": "67890",
-            "reviewer": {"displayName": "Jane Smith"},
-            "starRating": "FOUR",
-            "comment": "Great experience overall. The project was completed on time and on budget. Just a small issue with scheduling, but it was resolved quickly.",
-            "createTime": "2024-07-19T15:30:00Z",
-            "updateTime": "2024-07-19T15:30:00Z",
-        },
-        {
-            "reviewId": "54321",
-            "reviewer": {"displayName": "Sam Wilson"},
-            "starRating": "FIVE",
-            "comment": "Incredible work on our pool installation. The attention to detail was amazing.",
-            "createTime": "2024-07-21T11:00:00Z",
-            "updateTime": "2024-07-21T11:00:00Z",
+        # In a real app, you'd get the service differently, probably
+        # reusing a single service object.
+        service = get_google_api_service('mybusinessreviews', 'v1')
+
+        # The parent resource name for listing reviews
+        parent = f"accounts/{account_id}/locations/{location_id}"
+
+        # List reviews, filtering for those without replies
+        reviews_response = service.accounts().locations().reviews().list(
+            parent=parent,
+            filter='hasReply=false'
+        ).execute()
+
+        reviews = reviews_response.get('reviews', [])
+        print(f"Found {len(reviews)} new reviews.")
+        return reviews
+
+    except Exception as e:
+        print(f"Error fetching Google reviews: {e}")
+        return []
+
+
+def generate_reply_with_gemini(review, business):
+    """
+    Generates a personalized reply using the Gemini API.
+    """
+    print(f"Generating Gemini reply for review: {review.get('comment', '')[:50]}...")
+
+    try:
+        genai.api_key = business.gemini_api_key
+        model = genai.GenerativeModel('gemini-pro')
+
+        reviewer_name = review.get('reviewer', {}).get('displayName', 'Valued Customer')
+        star_rating = review.get('starRating', 'NOT_SPECIFIED').replace('STAR_RATING_', '')
+        comment = review.get('comment', '')
+
+        prompt = f"""
+        You are an AI assistant for a high-end home service business named "{business.business_name}".
+        Your task is to draft a personalized, professional, and friendly reply to a customer review.
+        The business specializes in: {business.specialties}.
+
+        Review Details:
+        - Reviewer Name: {reviewer_name}
+        - Star Rating: {star_rating} out of 5
+        - Customer's Comment: "{comment}"
+
+        Instructions:
+        1.  Always thank the reviewer by name for their feedback.
+        2.  If the rating is 4 or 5 stars, the tone should be positive and appreciative. Try to incorporate specific positive keywords from their review into your reply.
+        3.  If the rating is 3 stars or less, the tone should be empathetic and concerned. Apologize for their experience and offer to make things right. Provide a generic "please contact our office" call to action, but do not invent a phone number or email.
+        4.  Keep the reply concise (2-4 sentences).
+        5.  Sign off with "The {business.business_name} Team".
+
+        Draft the reply now.
+        """
+
+        response = model.generate_content(prompt)
+        return response.text.strip()
+
+    except Exception as e:
+        print(f"Error generating Gemini reply: {e}")
+        return "Thank you for your feedback. We appreciate you taking the time to share your experience."
+
+
+def post_google_reply(review_name, reply_text):
+    """
+    Posts a reply to a review on Google using the Business Profile API.
+    """
+    print(f"Posting reply to review {review_name}...")
+    try:
+        service = get_google_api_service('mybusinessreviews', 'v1')
+
+        # The body of the request contains the reply text
+        body = {
+            "comment": reply_text
         }
-    ]
 
-    # Simulate finding a review that hasn't been replied to
-    return [random.choice(mock_reviews)]
+        # The 'name' of the review is its unique identifier for the API
+        service.reviews().updateReply(name=review_name, body=body).execute()
 
-
-def generate_reply_with_gemini(api_key, review):
-    """
-    Placeholder function to generate a reply using the Gemini API.
-    For now, it returns a canned response based on the star rating.
-    """
-    print(f"Generating Gemini reply for review: {review['comment'][:30]}...")
-
-    rating = review.get('starRating')
-    comment = review.get('comment', '')
-
-    if rating == 'FIVE':
-        # Simple keyword extraction placeholder
-        positive_keywords = ["fantastic", "professional", "efficient", "exceeded", "highly recommend", "incredible", "amazing"]
-        found_keywords = [kw for kw in positive_keywords if kw in comment.lower()]
-
-        if found_keywords:
-            keyword_phrase = f"We're so glad you found our service to be {found_keywords[0]}!"
-        else:
-            keyword_phrase = "Thank you for the wonderful feedback!"
-
-        return f"Dear {review['reviewer']['displayName']}, thank you so much for your 5-star review! {keyword_phrase} We truly appreciate your business and hope to see you again."
-
-    elif rating == 'FOUR':
-        return f"Dear {review['reviewer']['displayName']}, thank you for your feedback. We're glad you had a great experience and appreciate you bringing the scheduling issue to our attention. We'll work on improving that."
-
-    else:
-        return f"Dear {review['reviewer']['displayName']}, thank you for your review. We're sorry to hear you had a less than perfect experience. Please contact us so we can make things right."
-
-
-def post_google_reply(api_key, review_id, reply):
-    """
-    Placeholder function to post a reply to a review on Google.
-    """
-    print(f"Posting reply to review {review_id}: '{reply}'")
-    # In a real implementation, this would make an API call to:
-    # service.accounts().locations().reviews().updateReply()
-    print("Reply posted successfully (simulated).")
+        print("Reply posted successfully.")
+    except Exception as e:
+        print(f"Error posting Google reply: {e}")
 
 
 def process_reviews_for_business(business):
     """
-    Processes reviews for a single business.
+    Processes new reviews for a single business by fetching, generating a reply,
+    and posting it back.
     """
     print(f"Starting review processing for {business.business_name}...")
 
-    # These would be fetched securely, perhaps from the business profile
-    google_api_key = business.google_api_key or os.environ.get("GOOGLE_API_KEY")
-    gemini_api_key = business.gemini_api_key or os.environ.get("GEMINI_API_KEY")
-
-    # These would also be part of the business profile
-    # For now, using placeholders
-    google_account_id = "123456789"
-    google_location_id = "987654321"
-
-    if not google_api_key or not gemini_api_key:
-        print(f"Skipping {business.business_name}: Missing API keys.")
+    if not all([business.google_api_key, business.gemini_api_key, business.google_account_id, business.google_location_id]):
+        print(f"Skipping {business.business_name}: Missing API keys or Google account/location IDs.")
         return
 
-    # 1. Fetch new reviews
-    # In a real app, you'd filter for reviews without replies.
-    reviews_to_reply = get_google_reviews(google_api_key, google_account_id, google_location_id)
+    reviews_to_reply = get_google_reviews(business)
 
     if not reviews_to_reply:
         print(f"No new reviews to process for {business.business_name}.")
         return
 
     for review in reviews_to_reply:
-        # 2. Generate a personalized reply
-        reply_text = generate_reply_with_gemini(gemini_api_key, review)
-
-        # 3. Post the reply back to Google
-        post_google_reply(google_api_key, review['reviewId'], reply_text)
+        reply_text = generate_reply_with_gemini(review, business)
+        review_name = review.get('name') # The unique ID for the review
+        if review_name:
+            post_google_reply(review_name, reply_text)
 
     print(f"Finished review processing for {business.business_name}.")
 
-
-from flask import current_app
 
 def schedule_review_processing():
     """
