@@ -51,5 +51,19 @@ class BusinessProfile(db.Model):
     google_ads_customer_id = db.Column(db.String(128))
     campaign_status = db.Column(db.String(64), default='Not Started')
 
+    clients = db.relationship('Client', backref='business_profile', lazy='dynamic', cascade="all, delete-orphan")
+
     def __repr__(self):
         return f'<BusinessProfile {self.business_name}>'
+
+class Client(db.Model):
+    id = db.Column(db.Integer, primary_key=True)
+    business_profile_id = db.Column(db.Integer, db.ForeignKey('business_profile.id'), nullable=False)
+    name = db.Column(db.String(120), nullable=False)
+    email = db.Column(db.String(120), nullable=False)
+    job_description = db.Column(db.Text)
+    job_completion_date = db.Column(db.Date)
+    follow_up_sent_date = db.Column(db.DateTime)
+
+    def __repr__(self):
+        return f'<Client {self.name}>'

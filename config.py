@@ -21,3 +21,6 @@ class Config:
 
     # For field encryption
     SECRET_ENCRYPTION_KEY = os.environ.get('SECRET_ENCRYPTION_KEY') or 'default-encryption-key-is-not-secure'
+
+    # SendGrid
+    SENDGRID_API_KEY = os.environ.get('SENDGRID_API_KEY')

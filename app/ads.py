@@ -3,7 +3,7 @@ import uuid
 from google.ads.googleads.client import GoogleAdsClient
 from google.ads.googleads.errors import GoogleAdsException
 import google.generativeai as genai
-from ..extensions import db
+from .extensions import db
 
 
 def generate_ad_copy_with_gemini(business):

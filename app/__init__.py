@@ -18,9 +18,12 @@ def create_app(config_class=Config):
         scheduler.init_app(app)
         scheduler.start()
 
-    # Schedule the job
+    # Schedule the jobs
     if scheduler.get_job('schedule-review-processing') is None:
-        scheduler.add_job(id='schedule-review-processing', func='app.reputation:schedule_review_processing', trigger='interval', seconds=30) # Using seconds for testing
+        scheduler.add_job(id='schedule-review-processing', func='app.reputation:schedule_review_processing', trigger='interval', minutes=60)
+
+    if scheduler.get_job('schedule-follow-up-processing') is None:
+        scheduler.add_job(id='schedule-follow-up-processing', func='app.followup:process_client_follow_ups', trigger='interval', days=1)
 
 
     # Register blueprints here
@@ -43,6 +46,9 @@ def create_app(config_class=Config):
 
     from .profile_bp import bp as profile_bp
     app.register_blueprint(profile_bp)
+
+    from .clients_bp import bp as clients_bp
+    app.register_blueprint(clients_bp)
 
     # Import models here to ensure they are registered with SQLAlchemy
     from . import models
