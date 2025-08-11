@@ -1,3 +1,4 @@
+import logging
 from flask import Flask
 from config import Config
 from .extensions import db, login_manager, migrate, scheduler
@@ -7,6 +8,15 @@ from flask_dance.contrib.google import make_google_blueprint
 def create_app(config_class=Config):
     app = Flask(__name__)
     app.config.from_object(config_class)
+
+    # Configure logging
+    if not app.debug and not app.testing:
+        handler = logging.StreamHandler()
+        formatter = logging.Formatter('%(asctime)s %(levelname)s: %(message)s [in %(pathname)s:%(lineno)d]')
+        handler.setFormatter(formatter)
+        app.logger.addHandler(handler)
+        app.logger.setLevel(logging.INFO)
+        app.logger.info('LocalVortex AI startup')
 
     # Initialize Flask extensions here
     db.init_app(app)

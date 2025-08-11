@@ -51,6 +51,9 @@ class BusinessProfile(db.Model):
     google_ads_customer_id = db.Column(db.String(128))
     campaign_status = db.Column(db.String(64), default='Not Started')
 
+    # Dashboard Stats
+    reviews_replied_count = db.Column(db.Integer, default=0)
+
     clients = db.relationship('Client', backref='business_profile', lazy='dynamic', cascade="all, delete-orphan")
 
     def __repr__(self):

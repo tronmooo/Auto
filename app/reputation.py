@@ -4,10 +4,6 @@ from googleapiclient.discovery import build
 from google.oauth2 import service_account
 from flask import current_app
 
-# It's assumed that the user will provide a service account JSON file
-# for authentication with Google APIs. The path to this file would be
-# stored in the environment. For now, this is a placeholder.
-# In a real app, you would load this from a secure location.
 SERVICE_ACCOUNT_FILE = os.environ.get('GOOGLE_APPLICATION_CREDENTIALS')
 
 def get_google_api_service(service_name, version):
@@ -15,55 +11,46 @@ def get_google_api_service(service_name, version):
     if not SERVICE_ACCOUNT_FILE:
         raise Exception("GOOGLE_APPLICATION_CREDENTIALS environment variable not set.")
 
-    # Define the scopes needed for the Business Profile API
     scopes = ['https://www.googleapis.com/auth/business.manage']
-
     creds = service_account.Credentials.from_service_account_file(
         SERVICE_ACCOUNT_FILE, scopes=scopes)
-
     service = build(service_name, version, credentials=creds)
     return service
 
 def get_google_reviews(business):
     """
     Fetches new reviews from the Google Business Profile API.
-    This is a simplified example. A real implementation would need to handle
-    pagination and robust error checking.
     """
-    print(f"Fetching Google reviews for {business.business_name}...")
+    current_app.logger.info(f"Fetching Google reviews for {business.business_name}...")
     try:
-        # These IDs would be stored as part of the business profile
         account_id = business.google_account_id
         location_id = business.google_location_id
-
-        # In a real app, you'd get the service differently, probably
-        # reusing a single service object.
         service = get_google_api_service('mybusinessreviews', 'v1')
-
-        # The parent resource name for listing reviews
         parent = f"accounts/{account_id}/locations/{location_id}"
 
-        # List reviews, filtering for those without replies
         reviews_response = service.accounts().locations().reviews().list(
             parent=parent,
             filter='hasReply=false'
         ).execute()
 
+        from googleapiclient.errors import HttpError
+
         reviews = reviews_response.get('reviews', [])
-        print(f"Found {len(reviews)} new reviews.")
+        current_app.logger.info(f"Found {len(reviews)} new reviews for {business.business_name}.")
         return reviews
 
-    except Exception as e:
-        print(f"Error fetching Google reviews: {e}")
+    except HttpError as e:
+        current_app.logger.error(f"HTTP error fetching Google reviews for {business.business_name}: {e}")
         return []
-
+    except Exception as e:
+        current_app.logger.error(f"Unexpected error fetching Google reviews for {business.business_name}: {e}")
+        return []
 
 def generate_reply_with_gemini(review, business):
     """
     Generates a personalized reply using the Gemini API.
     """
-    print(f"Generating Gemini reply for review: {review.get('comment', '')[:50]}...")
-
+    current_app.logger.info(f"Generating Gemini reply for review: {review.get('comment', '')[:50]}...")
     try:
         genai.api_key = business.gemini_api_key
         model = genai.GenerativeModel('gemini-pro')
@@ -96,56 +83,59 @@ def generate_reply_with_gemini(review, business):
         return response.text.strip()
 
     except Exception as e:
-        print(f"Error generating Gemini reply: {e}")
+        current_app.logger.error(f"Error generating Gemini reply: {e}")
         return "Thank you for your feedback. We appreciate you taking the time to share your experience."
 
-
-def post_google_reply(review_name, reply_text):
+def post_google_reply(review_name, reply_text, business):
     """
     Posts a reply to a review on Google using the Business Profile API.
     """
-    print(f"Posting reply to review {review_name}...")
+    current_app.logger.info(f"Posting reply to review {review_name}...")
     try:
         service = get_google_api_service('mybusinessreviews', 'v1')
+        from googleapiclient.errors import HttpError
 
-        # The body of the request contains the reply text
-        body = {
-            "comment": reply_text
-        }
-
-        # The 'name' of the review is its unique identifier for the API
+        body = {"comment": reply_text}
         service.reviews().updateReply(name=review_name, body=body).execute()
+        current_app.logger.info(f"Reply posted successfully to {review_name}.")
 
-        print("Reply posted successfully.")
+        # Increment counter on success
+        if business.reviews_replied_count is None:
+            business.reviews_replied_count = 0
+        business.reviews_replied_count += 1
+        # The commit will happen in the parent function `process_reviews_for_business`
+
+    except HttpError as e:
+        current_app.logger.error(f"HTTP error posting Google reply to {review_name}: {e}")
     except Exception as e:
-        print(f"Error posting Google reply: {e}")
-
+        current_app.logger.error(f"Unexpected error posting Google reply to {review_name}: {e}")
 
 def process_reviews_for_business(business):
     """
     Processes new reviews for a single business by fetching, generating a reply,
     and posting it back.
     """
-    print(f"Starting review processing for {business.business_name}...")
-
+    current_app.logger.info(f"Starting review processing for {business.business_name}...")
     if not all([business.google_api_key, business.gemini_api_key, business.google_account_id, business.google_location_id]):
-        print(f"Skipping {business.business_name}: Missing API keys or Google account/location IDs.")
+        current_app.logger.warning(f"Skipping {business.business_name}: Missing API keys or Google account/location IDs.")
         return
 
     reviews_to_reply = get_google_reviews(business)
-
     if not reviews_to_reply:
-        print(f"No new reviews to process for {business.business_name}.")
+        current_app.logger.info(f"No new reviews to process for {business.business_name}.")
         return
 
     for review in reviews_to_reply:
         reply_text = generate_reply_with_gemini(review, business)
-        review_name = review.get('name') # The unique ID for the review
+        review_name = review.get('name')
         if review_name:
-            post_google_reply(review_name, reply_text)
+            post_google_reply(review_name, reply_text, business)
 
-    print(f"Finished review processing for {business.business_name}.")
+    # Commit any changes made during the process (e.g., incrementing counters)
+    from .extensions import db
+    db.session.commit()
 
+    current_app.logger.info(f"Finished review processing for {business.business_name}.")
 
 def schedule_review_processing():
     """
@@ -154,12 +144,12 @@ def schedule_review_processing():
     app = current_app._get_current_object()
     with app.app_context():
         from .models import BusinessProfile
-        print("Scheduler running: Checking for businesses to process...")
+        app.logger.info("Scheduler: Running review processing job.")
         businesses = BusinessProfile.query.all()
         if not businesses:
-            print("No businesses found to process.")
+            app.logger.info("Scheduler: No businesses found to process.")
             return
 
         for business in businesses:
             process_reviews_for_business(business)
-        print("Scheduler run finished.")
+        app.logger.info("Scheduler: Review processing job finished.")

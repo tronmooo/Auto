@@ -45,7 +45,7 @@
                             New Leads This Month
                         </dt>
                         <dd class="text-3xl font-semibold text-gray-900">
-                            12
+                            N/A
                         </dd>
                     </dl>
                 </div>
@@ -66,10 +66,10 @@
                 <div class="ml-5 w-0 flex-1">
                     <dl>
                         <dt class="text-sm font-medium text-gray-500 truncate">
-                            Reviews Replied To
+                            Reviews Replied To (Lifetime)
                         </dt>
                         <dd class="text-3xl font-semibold text-gray-900">
-                            47
+                            {{ current_user.business_profile.reviews_replied_count if current_user.business_profile else 0 }}
                         </dd>
                     </dl>
                 </div>

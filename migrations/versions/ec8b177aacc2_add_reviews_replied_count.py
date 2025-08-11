@@ -1,8 +1,8 @@
-"""Add Client model
+"""Add reviews replied count
 
-Revision ID: 28b1675df50f
+Revision ID: ec8b177aacc2
 Revises:
-Create Date: 2025-08-11 02:30:45.229006
+Create Date: 2025-08-11 02:53:17.580937
 
 """
 from alembic import op
@@ -11,7 +11,7 @@ import sqlalchemy_utils
 
 
 # revision identifiers, used by Alembic.
-revision = '28b1675df50f'
+revision = 'ec8b177aacc2'
 down_revision = None
 branch_labels = None
 depends_on = None
@@ -41,6 +41,7 @@ def upgrade():
     sa.Column('google_location_id', sa.String(length=128), nullable=True),
     sa.Column('google_ads_customer_id', sa.String(length=128), nullable=True),
     sa.Column('campaign_status', sa.String(length=64), nullable=True),
+    sa.Column('reviews_replied_count', sa.Integer(), nullable=True),
     sa.ForeignKeyConstraint(['user_id'], ['user.id'], ),
     sa.PrimaryKeyConstraint('id')
     )

@@ -11,7 +11,7 @@ def generate_follow_up_email(client, business):
     """
     Generates a personalized follow-up email using the Gemini API.
     """
-    print(f"Generating follow-up email for client {client.name}...")
+    current_app.logger.info(f"Generating follow-up email for client {client.name}...")
     try:
         genai.api_key = business.gemini_api_key
         model = genai.GenerativeModel('gemini-pro')
@@ -41,7 +41,6 @@ def generate_follow_up_email(client, business):
 
         response = model.generate_content(prompt)
 
-        # Basic parsing for Subject and Body
         subject = "Following up on your recent project"
         body = response.text
         if "Subject:" in response.text and "Body:" in response.text:
@@ -52,7 +51,7 @@ def generate_follow_up_email(client, business):
         return {"subject": subject, "body": body}
 
     except Exception as e:
-        print(f"Error generating Gemini follow-up email: {e}")
+        current_app.logger.error(f"Error generating Gemini follow-up email: {e}")
         return None
 
 
@@ -62,10 +61,9 @@ def send_email(to_email, subject, body):
     """
     sendgrid_api_key = current_app.config.get('SENDGRID_API_KEY')
     if not sendgrid_api_key:
-        print("SENDGRID_API_KEY not set. Cannot send email.")
+        current_app.logger.error("SENDGRID_API_KEY not set. Cannot send email.")
         return
 
-    # The "from" email should be a verified sender in your SendGrid account
     from_email = 'no-reply@localvortex.ai'
     message = Mail(
         from_email=from_email,
@@ -75,9 +73,9 @@ def send_email(to_email, subject, body):
     try:
         sg = SendGridAPIClient(sendgrid_api_key)
         response = sg.send(message)
-        print(f"Email sent to {to_email} with status code {response.status_code}")
+        current_app.logger.info(f"Email sent to {to_email} with status code {response.status_code}")
     except Exception as e:
-        print(f"Error sending email via SendGrid: {e}")
+        current_app.logger.error(f"Error sending email via SendGrid: {e}")
 
 
 def process_client_follow_ups():
@@ -86,9 +84,8 @@ def process_client_follow_ups():
     """
     app = current_app._get_current_object()
     with app.app_context():
-        print("Scheduler running: Checking for client follow-ups...")
+        app.logger.info("Scheduler: Running client follow-up job.")
 
-        # Find clients whose job was completed 7 days ago and who haven't received a follow-up
         seven_days_ago = datetime.date.today() - datetime.timedelta(days=7)
         clients_to_follow_up = Client.query.filter(
             Client.job_completion_date == seven_days_ago,
@@ -96,7 +93,7 @@ def process_client_follow_ups():
         ).all()
 
         if not clients_to_follow_up:
-            print("No clients due for follow-up today.")
+            app.logger.info("Scheduler: No clients due for follow-up today.")
             return
 
         for client in clients_to_follow_up:
@@ -107,4 +104,4 @@ def process_client_follow_ups():
                 client.follow_up_sent_date = datetime.datetime.utcnow()
                 db.session.commit()
 
-        print("Client follow-up run finished.")
+        app.logger.info("Scheduler: Client follow-up job finished.")
