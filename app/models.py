@@ -47,5 +47,9 @@ class BusinessProfile(db.Model):
     google_account_id = db.Column(db.String(128))
     google_location_id = db.Column(db.String(128))
 
+    # Google Ads specific IDs and status
+    google_ads_customer_id = db.Column(db.String(128))
+    campaign_status = db.Column(db.String(64), default='Not Started')
+
     def __repr__(self):
         return f'<BusinessProfile {self.business_name}>'

@@ -17,13 +17,15 @@ def dashboard():
 
     form = AdBudgetForm()
     if form.validate_on_submit():
-        budget = form.budget.data
-        if not current_user.business_profile:
-            flash('You must create a business profile first.', 'warning')
-            return redirect(url_for('main.dashboard')) # Or a profile creation page
+        budget_decimal = form.budget.data
+        budget_micros = int(budget_decimal * 1_000_000)
 
-        manage_ad_campaign(current_user.business_profile, budget)
-        flash(f'Successfully started your ad campaign with a daily budget of ${budget}!', 'success')
+        if not current_user.business_profile or not current_user.business_profile.google_ads_customer_id:
+            flash('Please complete your business profile, including the Google Ads Customer ID.', 'warning')
+            return redirect(url_for('profile.profile'))
+
+        manage_ad_campaign(current_user.business_profile, budget_micros)
+        flash(f'Ad campaign creation process has been started with a daily budget of ${budget_decimal}. Check the status on your dashboard.', 'success')
         return redirect(url_for('main.dashboard'))
 
     return render_template('main/dashboard.html', title='Dashboard', form=form)

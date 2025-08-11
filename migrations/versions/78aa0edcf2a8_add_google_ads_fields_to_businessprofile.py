@@ -1,8 +1,8 @@
-"""Consolidated initial migration with all features
+"""Add Google Ads fields to BusinessProfile
 
-Revision ID: 6ff68eebea91
+Revision ID: 78aa0edcf2a8
 Revises:
-Create Date: 2025-08-11 02:00:23.337162
+Create Date: 2025-08-11 02:12:57.528329
 
 """
 from alembic import op
@@ -11,7 +11,7 @@ import sqlalchemy_utils
 
 
 # revision identifiers, used by Alembic.
-revision = '6ff68eebea91'
+revision = '78aa0edcf2a8'
 down_revision = None
 branch_labels = None
 depends_on = None
@@ -39,6 +39,8 @@ def upgrade():
     sa.Column('gemini_api_key', sqlalchemy_utils.types.encrypted.encrypted_type.EncryptedType(), nullable=True),
     sa.Column('google_account_id', sa.String(length=128), nullable=True),
     sa.Column('google_location_id', sa.String(length=128), nullable=True),
+    sa.Column('google_ads_customer_id', sa.String(length=128), nullable=True),
+    sa.Column('campaign_status', sa.String(length=64), nullable=True),
     sa.ForeignKeyConstraint(['user_id'], ['user.id'], ),
     sa.PrimaryKeyConstraint('id')
     )

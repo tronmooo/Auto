@@ -9,6 +9,7 @@ class ProfileForm(FlaskForm):
 
     google_account_id = StringField('Google Account ID', validators=[DataRequired()])
     google_location_id = StringField('Google Location ID', validators=[DataRequired()])
+    google_ads_customer_id = StringField('Google Ads Customer ID (without hyphens)', validators=[DataRequired()])
 
     # The API keys are large text areas
     google_api_key = TextAreaField('Google API Key (Service Account JSON)', validators=[DataRequired()])
